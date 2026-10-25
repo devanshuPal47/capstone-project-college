@@ -37,3 +37,10 @@ htmlcov/
 # Logs
 *.log
 pip-log.txt
+
+# Old static frontend (replaced by client/)
+public/
+
+# Client build output
+client/dist/
+client/.vite/

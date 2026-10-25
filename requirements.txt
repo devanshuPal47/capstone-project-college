@@ -1,3 +1,6 @@
 fastapi
 uvicorn
 pydantic
+
+# Optional: direct PostgreSQL via Supabase session pooler
+psycopg2-binary

@@ -1,0 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-soothing-50 text-soothing-800 antialiased;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-white/80 backdrop-blur-md border border-white/50 shadow-soft;
+  }
+  
+  .trip-card {
+    @apply bg-white rounded-2xl border border-gray-100 shadow-soft overflow-hidden transition-all duration-300 hover:shadow-soft-lg;
+  }
+  
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-xl font-semibold text-white bg-soothing-900 hover:bg-soothing-800 transition-colors duration-200 shadow-soft;
+  }
+  
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-xl font-semibold text-soothing-700 bg-white border border-gray-200 hover:bg-gray-50 transition-colors duration-200;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-soothing-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-travel-blue focus:border-transparent transition-all duration-200;
+  }
+  
+  .select-field {
+    @apply w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-soothing-800 focus:outline-none focus:ring-2 focus:ring-travel-blue focus:border-transparent transition-all duration-200 appearance-none cursor-pointer;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

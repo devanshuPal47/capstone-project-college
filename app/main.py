@@ -2,22 +2,31 @@
 from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from app.itinerary import generate_itinerary
-from app.supabase import save_trip, list_trips, get_trip
+from app.services.location import geocode
 
-app = FastAPI(title="Personalized Travel Itinerary Planner")
+app = FastAPI(title="Skillwallet Travel — Personalized Itinerary Planner")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class ItineraryRequest(BaseModel):
-    destination: str = Field(..., min_length=1)
-    budget: float = Field(..., gt=0)
-    start_date: str
-    end_date: str
-    interests: list[str] = Field(default_factory=list)
-    group_size: int = Field(default=1, gt=0)
-    travel_style: str = Field(default="balanced")
+    destination: str = Field(..., min_length=1, description="Travel destination")
+    budget: float = Field(..., gt=0, description="Total budget in USD")
+    start_date: str = Field(..., description="Start date (YYYY-MM-DD)")
+    end_date: str = Field(..., description="End date (YYYY-MM-DD)")
+    interests: list[str] = Field(default_factory=list, description="User interests")
+    group_size: int = Field(default=1, gt=0, description="Number of travelers")
+    travel_style: str = Field(default="balanced", description="relaxed | balanced | packed")
 
 
 class ItineraryResponse(BaseModel):
@@ -34,6 +43,17 @@ class ItineraryResponse(BaseModel):
     itinerary: list[dict]
 
 
+class LocationRequest(BaseModel):
+    destination: str
+
+
+class LocationResponse(BaseModel):
+    display_name: str
+    lat: float
+    lon: float
+    type: str | None = None
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -41,25 +61,26 @@ def health() -> dict[str, str]:
 
 @app.get("/destinations")
 def destinations() -> dict[str, list[str]]:
-    """Simple destination recommendation engine (no AI key required)."""
+    """Popular destination recommendations."""
     return {
         "destinations": [
-            "Paris", "Tokyo", "New York", "Bali", "Rome",
-            "Barcelona", "Kyoto", "London", "Bangkok", "Sydney",
+            "Paris, France",
+            "Tokyo, Japan",
+            "New York, USA",
+            "Bali, Indonesia",
+            "Rome, Italy",
+            "Barcelona, Spain",
+            "Kyoto, Japan",
+            "London, UK",
+            "Bangkok, Thailand",
+            "Sydney, Australia",
+            "Santorini, Greece",
+            "Cape Town, South Africa",
+            "Reykjavik, Iceland",
+            "Marrakech, Morocco",
+            "Vancouver, Canada",
         ]
     }
-
-
-@app.get("/trips")
-def trips() -> list[dict]:
-    """List saved trips from Supabase (empty if Supabase not configured)."""
-    return list_trips()
-
-
-@app.get("/trips/{trip_id}")
-def trip(trip_id: str) -> dict | None:
-    """Retrieve a single saved trip from Supabase."""
-    return get_trip(trip_id)
 
 
 @app.post("/generate-itinerary", response_model=ItineraryResponse)
@@ -76,11 +97,25 @@ def generate(request: ItineraryRequest) -> ItineraryResponse:
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-
-    # Best-effort persistence: degrade gracefully when Supabase is not configured.
-    try:
-        save_trip(result)
-    except Exception:  # noqa: BLE001 - never let storage failure block the user
-        pass
-
     return ItineraryResponse(**result)
+
+
+@app.post("/location", response_model=LocationResponse)
+def get_location(req: LocationRequest) -> LocationResponse:
+    """Geocode a destination using OpenStreetMap Nominatim (free map API)."""
+    loc = geocode(req.destination)
+    if loc is None:
+        raise HTTPException(status_code=404, detail="Location not found")
+    return LocationResponse(**loc)
+
+
+@app.get("/trips")
+def trips() -> list[dict]:
+    """List saved trips (placeholder for Supabase integration)."""
+    return []
+
+
+@app.get("/trips/{trip_id}")
+def trip(trip_id: str) -> dict | None:
+    """Retrieve a single saved trip (placeholder for Supabase integration)."""
+    return None

@@ -1,24 +1,20 @@
 """Itinerary generation logic.
 
-Deterministic fallback builder used when no GEN_AI_API_KEY is configured.
-Optionally enhanced by a generative AI API when the key is present.
+Gemini AI first (with reasoning), then deterministic fallback builder.
+Always respects user inputs: destination, dates, budget, group size, travel style, interests.
 """
 from __future__ import annotations
 
 import datetime as _dt
-import json
 import os
-import urllib.error
-import urllib.request
 from typing import Any
+
+from app.services.gemini import call_gemini as gemini_call_gemini
+from app.services.gemini import DEFAULT_MODEL as GEMINI_DEFAULT_MODEL
 
 
 def _parse_date(value: str) -> _dt.date:
     return _dt.date.fromisoformat(value)
-
-
-def _currency(value: float) -> str:
-    return f"${value:,.2f}"
 
 
 def _pick(options: list[str], index: int) -> str:
@@ -34,7 +30,7 @@ def build_fallback_itinerary(
     group_size: int,
     travel_style: str,
 ) -> dict[str, Any]:
-    """Build a structured day-by-day itinerary without calling any AI API."""
+    """Build a structured day-by-day itinerary without AI (deterministic fallback)."""
     start = _parse_date(start_date)
     end = _parse_date(end_date)
     if end < start:
@@ -43,6 +39,9 @@ def build_fallback_itinerary(
     days = (end - start).days + 1
     daily_budget = round(budget / days, 2)
 
+    # Style-based pacing modifiers
+    pace = {"relaxed": 1, "balanced": 2, "packed": 3}.get(travel_style, 2)
+
     attractions = [
         "Old Town walking tour",
         "City museum",
@@ -50,6 +49,8 @@ def build_fallback_itinerary(
         "Scenic lookout point",
         "Historic waterfront",
         "Botanical garden",
+        "Cultural heritage site",
+        "Neighborhood exploration",
     ]
     dining = [
         "Neighborhood bistro",
@@ -58,30 +59,39 @@ def build_fallback_itinerary(
         "Riverside cafe",
         "Local grill",
         "Bakery & coffee shop",
+        "Traditional eatery",
+        "Seafood restaurant",
     ]
     accommodations = [
         "City-center guesthouse",
         "Budget boutique hotel",
         "Hostel private room",
         "Airbnb apartment",
+        "Mid-range hotel",
     ]
     transport = [
         "Walk between sites",
         "Public bus / tram",
         "Rideshare",
         "Rental bike",
+        "Metro / subway",
     ]
 
     itinerary_days: list[dict[str, Any]] = []
     remaining = budget
     for i in range(days):
         day_date = start + _dt.timedelta(days=i)
+        # Vary activities based on pace and day index
+        activity_count = min(pace, 3)
+        morning = _pick(attractions, i)
+        afternoon = _pick(attractions, i + 2) if activity_count >= 2 else "Free time / leisure"
+        evening = _pick(dining, i)
         day = {
             "day": i + 1,
             "date": day_date.isoformat(),
-            "morning": _pick(attractions, i),
-            "afternoon": _pick(attractions, i + 2),
-            "evening": _pick(dining, i),
+            "morning": morning,
+            "afternoon": afternoon,
+            "evening": evening,
             "dining": _pick(dining, i + 3),
             "accommodation": _pick(accommodations, i),
             "transportation": _pick(transport, i),
@@ -114,61 +124,38 @@ def generate_itinerary(
     group_size: int,
     travel_style: str,
 ) -> dict[str, Any]:
-    """Generate an itinerary, using AI when available, else the fallback."""
-    api_key = os.getenv("GEN_AI_API_KEY")
-    endpoint = os.getenv("GEN_AI_ENDPOINT")
-    if api_key and endpoint:
-        try:
-            return _call_ai_api(
-                endpoint,
-                api_key,
-                destination,
-                budget,
-                start_date,
-                end_date,
-                interests,
-                group_size,
-                travel_style,
-            )
-        except Exception:  # noqa: BLE001 - degrade gracefully to fallback
-            pass
+    """Generate an itinerary: Gemini AI first, then fallback."""
+    # Calculate days for the prompt
+    start = _parse_date(start_date)
+    end = _parse_date(end_date)
+    days = (end - start).days + 1
+
+    # Try Gemini AI with reasoning
+    if os.getenv("GEMINI_API_KEY"):
+        result = gemini_call_gemini(
+            model=os.getenv("GEMINI_MODEL", GEMINI_DEFAULT_MODEL),
+            destination=destination,
+            budget=budget,
+            start_date=start_date,
+            end_date=end_date,
+            interests=interests,
+            group_size=group_size,
+            travel_style=travel_style,
+            days=days,
+        )
+        if result is not None:
+            result.setdefault("destination", destination)
+            result.setdefault("start_date", start_date)
+            result.setdefault("end_date", end_date)
+            result.setdefault("days", days)
+            result.setdefault("group_size", group_size)
+            result.setdefault("travel_style", travel_style)
+            result.setdefault("interests", interests)
+            result.setdefault("total_budget", budget)
+            result["generated_with_ai"] = True
+            return result
+
+    # Fallback to deterministic builder
     return build_fallback_itinerary(
         destination, budget, start_date, end_date, interests, group_size, travel_style
     )
-
-
-def _call_ai_api(
-    endpoint: str,
-    api_key: str,
-    destination: str,
-    budget: float,
-    start_date: str,
-    end_date: str,
-    interests: list[str],
-    group_size: int,
-    travel_style: str,
-) -> dict[str, Any]:
-    payload = {
-        "destination": destination,
-        "budget": budget,
-        "start_date": start_date,
-        "end_date": end_date,
-        "interests": interests,
-        "group_size": group_size,
-        "travel_style": travel_style,
-    }
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        endpoint,
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}",
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        body = resp.read().decode("utf-8")
-    result = json.loads(body)
-    result["generated_with_ai"] = True
-    return result

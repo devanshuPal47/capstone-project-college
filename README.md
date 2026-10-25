@@ -1,84 +1,136 @@
-# Personalized Travel Itinerary Planner
+# Skillwallet Travel — Personalized Itinerary Planner
 
-Very simple MVP of the travel itinerary planner. FastAPI backend + static HTML frontend, with a deterministic itinerary builder (works without any AI key) and optional Generative AI / Supabase enhancements.
+A beautiful, soothing, AI-powered travel itinerary planner with a React + Tailwind frontend and FastAPI backend.
 
-## Stack
-- Backend: FastAPI (Python stdlib + fastapi/uvicorn only)
-- Frontend: single static HTML page (`public/index.html`), no build step
-- AI: optional via `GEN_AI_API_KEY` / `GEN_AI_ENDPOINT`; deterministic fallback when unset
-- Supabase: optional trip persistence via `SUPABASE_URL` / `SUPABASE_ANON_KEY`; degrades gracefully when unset
+## 🎨 UI/UX
 
-## Prerequisites
-- Python 3.12+
-- (optional) Node only if you later add a React frontend — not required for this MVP
+- **Soothing color palette** — sage greens, soft indigos, warm neutrals
+- **Glassmorphism** — backdrop-blur panels with subtle borders
+- **Responsive design** — works on mobile, tablet, and desktop
+- **Smooth animations** — fade-in, slide-up transitions
+- **Dark mode toggle** — light/dark theme support
+- **Trip cards** — clean, scannable day-by-day layouts
 
-## Install ponytail skill (done)
-- `AGENTS.md` — project rules (ponytail ladder: reuse existing, stdlib first, minimum that works, one small test)
-- `skills/ponytail/SKILL.md` — the ponytail skill prompt
+## 📁 Project Structure
 
-## Install & run locally
+```
+college/
+├── app/                    # FastAPI backend
+│   ├── main.py             # API routes & CORS
+│   ├── itinerary.py        # Itinerary generation (Groq + fallback)
+│   ├── services/
+│   │   ├── groq.py         # Groq AI client with reasoning
+│   │   └── location.py     # OpenStreetMap geocoding
+│   └── tests/              # Backend tests
+├── client/                 # React + Vite + Tailwind frontend
+│   ├── src/
+│   │   ├── components/     # Navbar, TripBuilder, ItineraryView
+│   │   ├── pages/
+│   │   ├── hooks/
+│   │   ├── utils/          # Helpers, constants, API service
+│   │   ├── services/       # API client
+│   │   └── assets/
+│   ├── dist/               # Built frontend
+│   ├── package.json
+│   ├── tailwind.config.js
+│   └── vite.config.js
+├── .env                    # Your API keys (create from .env.example)
+├── .env.example
+├── requirements.txt
+└── README.md
+```
+
+## 🚀 Quick Start
+
+### 1. Backend
+
 ```powershell
-# 1. Create venv
+# Create & activate venv
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 
-# 2. Install dependencies
-pip install fastapi uvicorn pydantic pytest
+# Install dependencies
+pip install fastapi uvicorn pydantic pytest psycopg2-binary
 
-# 3. (optional) Configure env
+# Copy env template and add your keys
 copy .env.example .env
-# then edit .env with your GEN_AI_* and SUPABASE_* values
+# Edit .env with your GROQ_API_KEY
 
-# 4. Run the backend
-python -m uvicorn app.main:app --reload
+# Start server (port 8001 since 8000 may be blocked)
+python -m uvicorn app.main:app --reload --port 8001
 ```
-Backend: `http://localhost:8000`
-Frontend: open `public/index.html` in a browser (it calls `http://localhost:8000/generate-itinerary`)
 
-## Endpoints
-- `GET /health` — status
-- `POST /generate-itinerary` — body: `{destination, budget, start_date, end_date, interests[], group_size, travel_style}` → day-by-day itinerary
-- `GET /destinations` — recommended destination list
-- `GET /trips` — saved trips (Supabase only; empty if not configured)
-- `GET /trips/{trip_id}` — single trip (Supabase only)
+Backend: `http://127.0.0.1:8001`  
+API docs: `http://127.0.0.1:8001/docs`
 
-## Run tests
+### 2. Frontend (Development)
+
+```powershell
+cd client
+npm install
+npm run dev
+```
+
+Frontend: `http://localhost:5173` (proxies `/api` to backend on 8001)
+
+### 3. Frontend (Production Build)
+
+```powershell
+cd client
+npm run build
+# Serves static files from client/dist/
+```
+
+## 🔌 API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Health check |
+| `GET` | `/destinations` | Popular destination list |
+| `POST` | `/generate-itinerary` | Generate AI itinerary |
+| `POST` | `/location` | Geocode destination (lat/lon) |
+| `GET` | `/trips` | List saved trips |
+| `GET` | `/trips/{id}` | Get single trip |
+
+### Generate Itinerary Request
+
+```json
+{
+  "destination": "Paris, France",
+  "budget": 900,
+  "start_date": "2026-11-01",
+  "end_date": "2026-11-03",
+  "interests": ["food", "sightseeing", "culture"],
+  "group_size": 2,
+  "travel_style": "relaxed"
+}
+```
+
+## 🤖 AI Integration
+
+The planner uses **Groq** (`openai/gpt-oss-120b`) with structured reasoning:
+
+1. **System prompt** enforces strict adherence to user inputs (budget, dates, style, interests)
+2. **JSON mode** ensures valid, parseable output
+3. **Graceful fallback** — deterministic template builder if Groq is unavailable
+
+To enable AI: set `GROQ_API_KEY` in `.env`. Get a free key at [console.groq.com](https://console.groq.com/).
+
+## 🗺️ Location / Map
+
+Uses **OpenStreetMap Nominatim** (free, no API key) for geocoding destinations to lat/lon coordinates via the `/location` endpoint.
+
+## 🧪 Tests
+
 ```powershell
 .venv\Scripts\Activate.ps1
 python -m pytest
 ```
-Currently 3 tests pass (itinerary structure/branches, end-before-start error, Supabase graceful degradation).
 
-## Epic coverage (code-implementable)
-| Epic / Activity | Status |
-|---|---|
-| Epic 1: Environment setup | venv + requirements.txt done |
-| Epic 2.1: Create Supabase project | external — you create in Supabase dashboard |
-| Epic 2.2: Create tables | external — create `trips` table in Supabase SQL editor |
-| Epic 2.3: Store API keys in .env | `.env.example` done; fill `.env` |
-| Epic 3.1: User Preference Capture | `ItineraryRequest` model done |
-| Epic 3.2: Prompt Structuring Logic | `build_fallback_itinerary` done |
-| Epic 3.3: Destination Recommendation | `GET /destinations` done |
-| Epic 4.1: Daily Itinerary Builder | done |
-| Epic 4.2: Route & Time Optimization | sequential day builder done |
-| Epic 4.3: Vibe-Based Personalization | `travel_style` param done |
-| Epic 5.1: Trip Save & Management | `save_trip` + `/trips` endpoints done |
-| Epic 5.2: Share & Export | frontend prints/saves; `/trips/{id}` retrieve done |
-| Epic 5.3/5.4: Testing & Env config | tests + `.env.example` done |
-| Epic 6.1: Deploy Backend to Render | external — deploy this repo to Render |
-| Epic 6.2: Deploy Frontend to Vercel | external — point Vercel at `public/` or serve via backend |
-| Epic 7.1: Functional Testing | tests done |
-| Epic 7.2: Validate Database Updates | run `GET /trips` after configuring Supabase |
+Currently 6 tests pass (itinerary structure, branches, error handling, Groq degradation).
 
-## Items you must complete externally (not code I can create)
-- **Install Cursor IDE & set up GitHub repo** (Epic 1.1)
-- **Create Supabase project + `trips` table** (Epic 2.1, 2.2) — columns: `id`, `created_at`, plus the itinerary response fields
-- **Deploy backend to Render** (Epic 6.1)
-- **Deploy frontend to Vercel** (Epic 6.2)
-- **JWT / AI Token / Credits system** — not included in this simple MVP; add auth later if needed
+## 📝 Notes
 
-## What was skipped / not checked
-- No JWT/auth, AI token, or credits system (kept minimal per "very simple version" request)
-- No React frontend (single HTML page used instead)
-- Supabase table must be created manually; saving degrades gracefully if absent
-- AI integration only works if `GEN_AI_API_KEY` + `GEN_AI_ENDPOINT` are set and reachable
+- Port 8000 may be blocked on some systems — use `--port 8001`
+- `.env` is gitignored — never commit your API keys
+- The Groq key must be valid for AI generation; otherwise the smart template builder is used
