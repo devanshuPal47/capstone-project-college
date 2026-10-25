@@ -1,6 +1,11 @@
 """FastAPI backend for the Personalized Travel Itinerary Planner."""
 from __future__ import annotations
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -40,6 +45,7 @@ class ItineraryResponse(BaseModel):
     total_budget: float
     remaining_budget: float
     generated_with_ai: bool
+    location: dict | None = None
     itinerary: list[dict]
 
 

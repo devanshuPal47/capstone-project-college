@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 pydantic
+python-dotenv
 
 # Optional: direct PostgreSQL via Supabase session pooler
 psycopg2-binary
