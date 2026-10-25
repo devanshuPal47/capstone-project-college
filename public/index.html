@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personalized Travel Itinerary Planner</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 24px; background: #f5f7fa; color: #111; }
+  .wrap { max-width: 800px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  .sub { color: #666; font-size: 14px; margin-bottom: 24px; }
+  form { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+  label { font-size: 13px; font-weight: 600; color: #444; display: block; margin-bottom: 4px; }
+  input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+  textarea { resize: vertical; min-height: 60px; grid-column: 1 / -1; }
+  button { grid-column: 1 / -1; padding: 10px; border: none; border-radius: 6px; background: #111; color: #fff; font-weight: 600; cursor: pointer; font-size: 15px; }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .result { margin-top: 24px; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: none; }
+  .result h2 { font-size: 17px; margin-top: 0; }
+  .meta { font-size: 13px; color: #666; margin-bottom: 12px; }
+  .day { border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 10px; background: #fafafa; }
+  .day h3 { font-size: 14px; margin: 0 0 6px; color: #111; }
+  .day p { margin: 2px 0; font-size: 13px; color: #333; }
+  .err { color: #c00; font-size: 13px; margin-top: 10px; display: none; }
+</style>
+<body>
+  <div class="wrap">
+    <h1>Personalized Travel Itinerary Planner</h1>
+    <p class="sub">Generate a day-by-day itinerary based on your destination, budget, and preferences.</p>
+    <form id="form">
+      <label>Destination</label>
+      <input name="destination" placeholder="e.g. Paris" required>
+      <label>Travel dates (start)</label>
+      <input name="start_date" type="date" required>
+      <label>Travel dates (end)</label>
+      <input name="end_date" type="date" required>
+      <label>Total budget (USD)</label>
+      <input name="budget" type="number" min="0" step="0.01" placeholder="e.g. 900" required>
+      <label>Group size</label>
+      <input name="group_size" type="number" min="1" value="1" required>
+      <label>Travel style</label>
+      <select name="travel_style">
+        <option>relaxed</option><option>balanced</option><option>packed</option>
+      </select>
+      <label>Interests (comma separated)</label>
+      <textarea name="interests" placeholder="e.g. food, sightseeing, culture"></textarea>
+      <button type="submit">Generate Itinerary</button>
+    </form>
+    <div class="err" id="err"></div>
+    <div class="result" id="result">
+      <h2 id="dest"></h2>
+      <div class="meta" id="meta"></div>
+      <div id="days"></div>
+    </div>
+  </div>
+<script>
+  const form = document.getElementById('form');
+  const result = document.getElementById('result');
+  const err = document.getElementById('err');
+  const daysEl = document.getElementById('days');
+  const destEl = document.getElementById('dest');
+  const metaEl = document.getElementById('meta');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    result.style.display = 'none';
+    err.style.display = 'none';
+    const fd = new FormData(form);
+    const interests = fd.get('interests').split(',').map(s => s.trim()).filter(Boolean);
+    const body = {
+      destination: fd.get('destination'),
+      start_date: fd.get('start_date'),
+      end_date: fd.get('end_date'),
+      budget: parseFloat(fd.get('budget')),
+      group_size: parseInt(fd.get('group_size'), 10),
+      travel_style: fd.get('travel_style'),
+      interests,
+    };
+    try {
+      const res = await fetch('/generate-itinerary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      render(data);
+    } catch (err_) {
+      err.textContent = 'Failed to generate itinerary: ' + err_.message;
+      err.style.display = 'block';
+    }
+  });
+
+  function render(data) {
+    destEl.textContent = data.destination;
+    metaEl.textContent = `${data.start_date} to ${data.end_date} \u2022 ${data.days} day(s) \u2022 group of ${data.group_size} \u2022 ${data.travel_style} \u2022 budget $${data.total_budget} \u2022 ${data.generated_with_ai ? 'AI-generated' : 'template-based'}`;
+    daysEl.innerHTML = '';
+    for (const day of data.itinerary) {
+      const d = document.createElement('div');
+      d.className = 'day';
+      d.innerHTML = `
+        <h3>Day ${day.day} \u2022 ${day.date}</h3>
+        <p><strong>Morning:</strong> ${day.morning}</p>
+        <p><strong>Afternoon:</strong> ${day.afternoon}</p>
+        <p><strong>Evening:</strong> ${day.evening}</p>
+        <p><strong>Dining:</strong> ${day.dining}</p>
+        <p><strong>Accommodation:</strong> ${day.accommodation}</p>
+        <p><strong>Transportation:</strong> ${day.transportation}</p>
+        <p><strong>Estimated cost:</strong> $${day.estimated_cost}</p>
+      `;
+      daysEl.appendChild(d);
+    }
+    result.style.display = 'block';
+  }
+</script>
+</body>
+</html>
