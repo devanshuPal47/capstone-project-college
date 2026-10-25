@@ -329,6 +329,9 @@ def generate_itinerary(
     end = _parse_date(end_date)
     days = (end - start).days + 1
 
+    # Get location coordinates for map display
+    location = geocode(destination)
+
     # Try Gemini AI with reasoning
     if os.getenv("GEMINI_API_KEY"):
         result = gemini_call_gemini(
@@ -352,6 +355,11 @@ def generate_itinerary(
             result.setdefault("interests", interests)
             result.setdefault("total_budget", budget)
             result["generated_with_ai"] = True
+            result["location"] = (
+                {"lat": location["lat"], "lon": location["lon"]}
+                if location and location.get("lat") and location.get("lon")
+                else None
+            )
             return result
 
     # Fallback to deterministic builder

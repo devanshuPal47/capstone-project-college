@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ArrowLeft, MapPin, Clock, Bed, Utensils, Bus, Share2, Download, Moon, Sun, Heart } from 'lucide-react'
 import { formatCurrency, formatDay } from '../utils/helpers'
@@ -19,6 +19,64 @@ const LABELS = {
   dining: 'Dining',
   accommodation: 'Stay',
   transportation: 'Getting Around',
+}
+
+function TripMap({ destination, location }) {
+  const mapRef = useRef(null)
+  const mapInstanceRef = useRef(null)
+
+  useEffect(() => {
+    if (!location?.lat || !location?.lon) return
+
+    // Initialize map
+    const map = L.map(mapRef.current, {
+      center: [location.lat, location.lon],
+      zoom: 13,
+      zoomControl: true,
+    })
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19,
+    }).addTo(map)
+
+    // Add destination marker
+    const marker = L.marker([location.lat, location.lon]).addTo(map)
+    marker.bindPopup(
+      `<b>${destination}</b><br>Your trip destination`,
+      { direction: 'top', offset: [0, -10] }
+    )
+    marker.openPopup()
+
+    mapInstanceRef.current = map
+
+    return () => {
+      if (map) map.remove()
+    }
+  }, [destination, location?.lat, location?.lon])
+
+  // Invalidate map size when component mounts/shows
+  useEffect(() => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.invalidateSize()
+    }
+  }, [])
+
+  if (!location?.lat || !location?.lon) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-gray-50/50 overflow-hidden shadow-sm h-[400px] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-soothing-500 text-sm">Map location not available</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-2xl border border-gray-200 overflow-hidden shadow-sm h-[400px]">
+      <div ref={mapRef} className="w-full h-full" />
+    </div>
+  )
 }
 
 export default function ItineraryView({ itinerary: propItinerary, onBack }) {
@@ -167,18 +225,10 @@ Day ${day.day} - ${day.date}
             <h2 className="text-lg font-semibold text-soothing-900">Route Overview</h2>
             <div className="flex items-center gap-2 text-xs text-gray-500 uppercase tracking-wider font-semibold">
               <span className="w-2 h-2 rounded-full bg-travel-indigo" />
-              <span>Planned route</span>
+              <span>Destination on map</span>
             </div>
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-gray-50/50 overflow-hidden shadow-sm aspect-video relative flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-white/80 backdrop-blur flex items-center justify-center mx-auto mb-3 shadow-soft">
-                <MapPin size={24} strokeWidth={2} className="text-travel-indigo" />
-              </div>
-              <p className="text-soothing-500 text-sm">Interactive map preview</p>
-              <p className="text-xs text-gray-400 mt-1">Enable location services for map</p>
-            </div>
-          </div>
+          <TripMap destination={data.destination} location={data.location} />
         </div>
 
         {/* Itinerary Days */}
