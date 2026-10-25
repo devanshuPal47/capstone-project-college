@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from app.itinerary import generate_itinerary
+from app.supabase import save_trip, list_trips, get_trip
 
 app = FastAPI(title="Personalized Travel Itinerary Planner")
 
@@ -38,6 +39,29 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/destinations")
+def destinations() -> dict[str, list[str]]:
+    """Simple destination recommendation engine (no AI key required)."""
+    return {
+        "destinations": [
+            "Paris", "Tokyo", "New York", "Bali", "Rome",
+            "Barcelona", "Kyoto", "London", "Bangkok", "Sydney",
+        ]
+    }
+
+
+@app.get("/trips")
+def trips() -> list[dict]:
+    """List saved trips from Supabase (empty if Supabase not configured)."""
+    return list_trips()
+
+
+@app.get("/trips/{trip_id}")
+def trip(trip_id: str) -> dict | None:
+    """Retrieve a single saved trip from Supabase."""
+    return get_trip(trip_id)
+
+
 @app.post("/generate-itinerary", response_model=ItineraryResponse)
 def generate(request: ItineraryRequest) -> ItineraryResponse:
     try:
@@ -52,4 +76,11 @@ def generate(request: ItineraryRequest) -> ItineraryResponse:
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+    # Best-effort persistence: degrade gracefully when Supabase is not configured.
+    try:
+        save_trip(result)
+    except Exception:  # noqa: BLE001 - never let storage failure block the user
+        pass
+
     return ItineraryResponse(**result)
